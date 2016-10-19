@@ -6,21 +6,13 @@ import math
 from functools import partial
 
 class Application(tk.Frame):
-    def __init__(self, master=None):
+    def __init__(self,physWorld,master=None):
         tk.Frame.__init__(self, master)
+        self.physWorld=physWorld
         self.grid()
         self.createWidgets()
         self.done = False
         self.pause = True
-        self.dt = 0.01
-        self.dN = 100
-        self.Nt=0
-        self.X=(np.random.random(1000))*np.linspace(10,-10,1000)
-        self.pX=np.zeros(1000)
-        #self.X=self.pX=np.ndarray(1000)
-        #for i in range(len(self.X)):
-        #    self.X[i]=math.sin(math.exp(i/50))#np.random.random()
-        #    self.pX[i]=0
 
     def pauseOnButton(self):
         self.pause = not self.pause
@@ -37,24 +29,10 @@ class Application(tk.Frame):
                                     command=self.pauseOnButton)
         self.ButtonPause = tk.Button(self, text='Quit',
                                      command=self.quiteOnButton)
-        def muldN(i):
-            if i>0:
-                self.dN*=10
-            elif i<0 and self.dN>=10:
-                self.dN=int(self.dN/10)
-        def muldt(i):
-            if i>0:
-                self.dt*=10
-            elif i<0 :
-                self.dt/=10
-        self.ButtonPlus = tk.Button(self, text='+',
-                                     command=partial(muldN,1))
-        self.ButtonMnus = tk.Button(self, text='-',
-                                     command=partial(muldN,-1))
-        self.ButtonMult = tk.Button(self, text='*',
-                                     command=partial(muldt,1))
-        self.ButtonDiv = tk.Button(self, text='/',
-                                     command=partial(muldt,-1))
+        self.ButtonPlus = tk.Button(self, text='+',command=partial(self.physWorld.onButton,'+'))
+        self.ButtonMnus = tk.Button(self, text='-',command=partial(self.physWorld.onButton,'-'))
+        self.ButtonMult = tk.Button(self, text='*',command=partial(self.physWorld.onButton,'*'))
+        self.ButtonDiv = tk.Button(self, text='/',command=partial(self.physWorld.onButton,'/'))
         self.timetext = tk.Label(self, text='0')
         self.ButtonQuit.grid(column=0, row=1)
         self.ButtonPause.grid(column=6, row=1)
@@ -78,70 +56,60 @@ class Application(tk.Frame):
         self.canvas.bind("<Button-3>",canvasclick)
         self.canvas.bind("<Button-4>",wheelscroll)
         self.canvas.bind("<Button-5>",wheelscroll)
-        #self.bind_all("<MouseWheel>", wheelscroll)
         self.img = tk.PhotoImage(width=self.canvas['width'], height=self.canvas['height'])
-        self.canvas.create_image((300, 300), image=self.img, state="normal")
+        self.canvas.create_image((int(int(self.canvas['width'])/2),int(int(self.canvas['height'])/2)), image=self.img, state="normal")
+
         self.canvas.grid(column=0, row=0, columnspan=7)
         print("finish creation")
 
     def draw(self):
-        #print("draw")
-        self.canvas.delete('all')
-        #self.canvas.create_rectangle(0, 0, self.img.width(), self.img.height(), fill='#ffffff')
-        # for x in range(4 * WIDTH):
-        #    y = int(HEIGHT / 2 + HEIGHT / 4 * sin(x / 80.0))
-        #    img.put("#ffffff", (x // 4, y))
-        maxX=int(max(max(self.X),abs(min(self.X))))
+        c=self.physWorld.getCoordinatesAndColors()
+        #print("draw",len(c),c[0])
         def cordY(y):
-            return int((-y/maxX+1)*0.5*self.img.height())
+            return int((0.9-y*0.8)*self.img.height())
         def cordX(x):
-            return int(x+50)
-        #self.canvas.create_rectangle(0, 0, 100, 200, fill='#00ff00')
-        #self.canvas.create_text(200,100,text="hello_word")
+            return int((0.1+0.8*x)*self.img.width())
+        #self.canvas.create_text(200,100,text="hello_word",fill='#00ff00')
         #for n in range(len(self.X)):
             #if n>0 and n< self.img.width() and cordY(self.X[n])>0 and cordY(self.X[n])<self.img.height():
                 #self.img.put("#000000", (n, cordY(self.pX[n])))
                 #self.img.put("#ff0000", (n, cordY(self.X[n])))
                 #self.canvas.create_rectangle(n, cordY(self.X[n]), n+2, cordY(self.X[n])+2, fill='#FF0000')
-        self.canvas.create_line(cordX(0), cordY(0), cordX(len(self.X)), cordY(0), fill='#0000FF')
-        for n in range(maxX):
-            self.canvas.create_line(cordX(0), cordY(n), cordX(len(self.X)), cordY(n), fill='#00F0FF')
-        for n in range(len(self.X)-1):
-            self.canvas.create_line(cordX(n), cordY(self.X[n]), cordX(n+1), cordY(self.X[n+1]), fill='#FF0000')
-        #self.canvas.create_rectangle(300+self.R[0], 300+self.R[1], self.R[0]+303, self.R[1]+303, fill='#FF0000')
+        def converColor(color):
+            return '#'+hex(int(color[0]*(2**4-1)))[2:]+hex(int(color[1]*(2**4-1)))[2:]+hex(int(color[2]*(2**4-1)))[2:]
+
+        self.canvas.delete('all')
+        if self.physWorld.typeOfCoordinates=='lines':
+            for n in range(len(c) - 1):
+                self.canvas.create_line(cordX(c[n][0]), cordY(c[n][1]), cordX(c[n+1][0]), cordY(c[n+1][1]), fill=converColor(c[n][2:]))
+        elif self.physWorld.typeOfCoordinates=='dots':
+            self.img = tk.PhotoImage(width=self.canvas['width'], height=self.canvas['height'])
+            self.canvas.create_image((int(int(self.canvas['width']) / 2), int(int(self.canvas['height']) / 2)),image=self.img, state="normal")
+            for n in range(len(c)):
+                self.img.put(converColor(c[n][2:]), (cordX(c[n][0]), cordY(c[n][1])))
+
+
+        #for n in range(self):
+        self.canvas.create_line(cordX(self.physWorld.coordX0), cordY(0), cordX(self.physWorld.coordX0), cordY(1), fill='#00F0FF')
+        self.canvas.create_line(cordX(self.physWorld.coordX1), cordY(0), cordX(self.physWorld.coordX1), cordY(1), fill='#00F0FF')
+        #for n in range(maxX):
+        self.canvas.create_line(cordX(0), cordY(self.physWorld.coordY0), cordX(1), cordY(self.physWorld.coordY0), fill='#00F0FF')
+        self.canvas.create_line(cordX(0), cordY(self.physWorld.coordY1), cordX(1), cordY(self.physWorld.coordY1),fill='#00F0FF')
 
     def actionloop(self):
-        #while not self.done and not self.pause:
-            #time.sleep(0.001)
-        if not self.done and not self.pause:
-            for i in range(self.dN-1):
-                self.physstep()
+        if not self.done and not self.pause and not self.physWorld.done:
             self.step()
             self.canvas.after(1, self.actionloop)
 
-    def physstep(self):
-        dL=0.001;
-        def C(T,x):
-            return (1+T/100+10*np.exp(-T*2/200))*x**2
-        def X(T,x):
-            return (1-T/100)*x**2
-        self.X,self.pX=(self.X+
-                        self.dt*X(self.X,np.linspace(1,len(self.X)+1,len(self.X)))
-                        /C(self.X,np.linspace(1,len(self.X)+1,len(self.X)))
-                        *(-2*self.X+np.roll(self.X,1)+np.roll(self.X,-1))),self.X
-        self.X[0]=self.X[1]
-        A=10**2
-        self.X[-1]=self.pX[-2]+10**6*(3-math.exp(self.X[-1]))/X(self.X[-1],len(self.X)+1)
-        self.Nt+=1
-
     def step(self):
-        self.physstep()
+        self.physWorld.step()
         self.draw()
-        self.timetext['text'] = str(self.Nt)
-
+        #print("drawing ends")
+        self.timetext['text'] = self.physWorld.text
 
 def main():
-    app = Application()
+    import termoconductivity
+    app = Application(termoconductivity.Termoconductivity())
     app.master.title('Sample application')
     print("here")
     #app.after(500,app.physicloop)
